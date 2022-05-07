@@ -8,11 +8,13 @@ logger = logging.getLogger('em.psse')
 
 import os
 dirname = os.path.dirname(__file__)
+if dirname=='':
+    dirname='.'
 with open('{}/psse-modes.yaml'.format(dirname),'r') as in_file:
-	modes = yaml.load(in_file)
+	modes = yaml.safe_load(in_file)
 
 
-	
+
 def get_signals(line_num,line,current_mode):
 	#print(line_num,line)
 	signals = []
@@ -60,10 +62,10 @@ def read_transformer(lines,records):
 		except Exception as e:
 			windings = 3
 			rows.append(next(iter_lines))
-		
+
 		for r in range(len(rows)):
 			line_holder[windings][r].append(rows[r])
-	
+
 	dfs={
 		2:[],
 		3:[]
@@ -91,10 +93,10 @@ def read_twodc(lines,records):
 		rows=[line]
 		rows.append(next(iter_lines))
 		rows.append(next(iter_lines))
-		
+
 		for r in range(len(rows)):
 			line_holder[r].append(rows[r])
-	
+
 	dfs=[]
 	rc=0
 	for record in line_holder:
@@ -146,10 +148,10 @@ def parse_raw(in_file_name):
 		line_num = 0
 		while line:
 			line_num+=1
-			
+
 			START = None
 			STOP = None
-			
+
 			# Process signals
 			signals = get_signals(line_num,line,current_mode)
 			for signal,mode in signals:
@@ -161,23 +163,23 @@ def parse_raw(in_file_name):
 
 			if current_mode and START and not STOP:
 				raise ValueError('Current mode was never stopped')
-			
+
 
 			# Store lines
 			if current_mode and (not STOP or 'keep_tail' in STOP):
 				key = current_mode['key']
 				output[key]['lines'].append(line)
 				#print key
-				
+
 			if STOP and current_mode and current_mode['key'] != STOP['key']:
 				raise ValueError('Attempting to stop a different mode',current_mode['key'],STOP['key'])
 			elif START:
 				current_mode = START
 			elif STOP:
 				current_mode = None
-			
+
 			line = in_file.readline()
-			
+
 
 	logger.debug("Captured Lines")
 	for i in output:
@@ -191,11 +193,11 @@ def parse_raw(in_file_name):
 		if len(lines)==1:
 			logger.debug('only header {}'.format(i))
 			continue
-		
+
 		if 'read_table' in output[i]['parse']:
 			text = StringIO(''.join(lines))
 			output[i]['df'] = pd.read_table(text,sep=',')
-		
+
 		if 'read_transformer' in output[i]['parse']:
 			output[i]['dfs']=read_transformer(lines,output[i]['records'])
 			df2=pd.concat(output[i]['dfs'][2],axis=1, sort=False)
@@ -207,7 +209,7 @@ def parse_raw(in_file_name):
 			output[i]['df']=pd.concat(output[i]['dfs'],axis=1, sort=False)
 
 
-		
+
 		logger.debug('{} {} {}'.format(i, len(lines), 'df' in output[i]))
 		if 'df' in output[i]:
 			logger.info('Parsed {} {}'.format(len(output[i]['df']),i))
